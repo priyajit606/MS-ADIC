@@ -2,77 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MS-ADIC | Cinematic AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; }
-        .shimmer { background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6); background-size: 200% auto; animation: shine 3s linear infinite; }
+        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; }
+        .btn-shimmer { background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6); background-size: 200% auto; animation: shine 3s linear infinite; }
         @keyframes shine { to { background-position: 200% center; } }
-        .loader { width: 24px; height: 24px; border: 3px solid #FFF; border-bottom-color: transparent; border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite; }
-        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center p-6">
-    <div class="glass p-8 w-full max-w-xl text-center shadow-2xl">
-        <h1 class="text-4xl font-black mb-2 tracking-tight">MS-ADIC <span class="text-blue-500">STUDIO</span></h1>
-        <p class="text-slate-400 mb-8 font-medium">Professional Image-to-Video AI</p>
+<body class="flex flex-col items-center justify-center p-4">
+    <div class="glass p-8 w-full max-w-lg text-center">
+        <h1 class="text-3xl font-bold mb-4">🎬 MS-ADIC Studio</h1>
+        <p class="text-gray-400 mb-6">Convert Images to High-Quality Video</p>
         
-        <div class="relative group mb-6">
-            <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-            <div class="border-2 border-dashed border-slate-700 rounded-xl p-10 group-hover:border-blue-500 transition-all bg-slate-800/50">
-                <p id="fileName" class="text-slate-300">Drop image here or <span class="text-blue-400">Browse</span></p>
-            </div>
-        </div>
-
-        <button id="btn" onclick="generate()" class="shimmer w-full py-4 rounded-xl font-bold text-lg hover:scale-[1.02] transition-transform active:scale-95">
-            CREATE REALISTIC VIDEO ✨
+        <input type="file" id="imgIn" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-6">
+        
+        <button id="genBtn" onclick="start()" class="btn-shimmer w-full py-3 rounded-lg font-bold text-white shadow-lg transform active:scale-95 transition-all">
+            GENERATE VIDEO ✨
         </button>
         
-        <div id="statusContainer" class="mt-6 hidden">
-            <span class="loader mb-2"></span>
-            <p id="statusText" class="text-blue-400 font-medium"></p>
-        </div>
-
-        <video id="outputVideo" class="mt-8 rounded-xl w-full shadow-2xl border border-white/10 hidden" controls autoplay loop></video>
+        <div id="loader" class="hidden mt-6 text-blue-400">⚡ AI is generating (approx 45s)...</div>
+        <video id="vidOut" class="hidden mt-6 rounded-lg w-full shadow-2xl" controls autoplay loop></video>
     </div>
 
     <script>
-        const input = document.getElementById('imageInput');
-        input.onchange = () => { document.getElementById('fileName').innerText = input.files[0].name; };
+        async function start() {
+            const input = document.getElementById('imgIn');
+            const loader = document.getElementById('loader');
+            const video = document.getElementById('vidOut');
+            const btn = document.getElementById('genBtn');
 
-        async function generate() {
-            const statusBox = document.getElementById('statusContainer');
-            const statusText = document.getElementById('statusText');
-            const video = document.getElementById('outputVideo');
-            const btn = document.getElementById('btn');
-
-            if (!input.files[0]) return alert("Upload a photo first!");
-
+            if (!input.files[0]) return alert("Please select a photo!");
+            
             btn.disabled = true;
-            statusBox.classList.remove('hidden');
+            loader.classList.remove('hidden');
             video.classList.add('hidden');
-            statusText.innerText = "Analyzing Scene...";
 
             const reader = new FileReader();
             reader.readAsDataURL(input.files[0]);
             reader.onload = async () => {
-                statusText.innerText = "Generating Realistic Motion (60s)...";
                 try {
-                    const response = await fetch('/api/generate', {
+                    const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ image: reader.result })
                     });
-                    const data = await response.json();
+                    const data = await res.json();
                     if (data.url) {
                         video.src = data.url;
                         video.classList.remove('hidden');
-                        statusBox.classList.add('hidden');
-                    } else { alert("Error: " + data.error); }
-                } catch (e) { alert("Connection failed!"); }
-                finally { btn.disabled = false; statusBox.classList.add('hidden'); }
+                    } else { alert("AI Busy or Error: " + data.error); }
+                } catch (e) { alert("Connection failed. Try a smaller image!"); }
+                finally { btn.disabled = false; loader.classList.add('hidden'); }
             };
         }
     </script>
