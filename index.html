@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Video Studio Free</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #f4f4f9; }
+        .box { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; }
+        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🎥 Image to Video AI</h1>
+        <input type="file" id="img" accept="image/*"><br><br>
+        <button onclick="makeVideo()">Generate Video</button>
+        <p id="msg"></p>
+        <video id="out" controls style="display:none; margin-top:20px; width:100%;"></video>
+    </div>
+
+    <script>
+        async function makeVideo() {
+            const file = document.getElementById('img').files[0];
+            if (!file) return alert("Select an image!");
+            
+            document.getElementById('msg').innerText = "AI is working... (60s)";
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({ image: reader.result })
+                });
+                const data = await res.json();
+                if (data.url) {
+                    document.getElementById('out').src = data.url;
+                    document.getElementById('out').style.display = "block";
+                    document.getElementById('msg').innerText = "Success!";
+                } else {
+                    document.getElementById('msg').innerText = "Error: " + data.error;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
