@@ -2,25 +2,20 @@ export default async function handler(req, res) {
     const API_KEY = process.env.SF_KEY;
     const { image, jobId } = req.body;
 
-    // --- STEP 2: CHECK STATUS ---
+    // IF CHECKING STATUS
     if (jobId) {
         try {
-            const checkRes = await fetch(`https://api.siliconflow.cn`, {
-                method: "POST",
-                headers: { 
-                    "Authorization": `Bearer ${API_KEY}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ requestId: jobId })
+            const sRes = await fetch(`https://api.siliconflow.cn{jobId}`, {
+                headers: { "Authorization": `Bearer ${API_KEY}` }
             });
-            const statusData = await checkRes.json();
-            return res.status(200).json(statusData);
+            const sData = await sRes.json();
+            return res.status(200).json(sData);
         } catch (e) {
-            return res.status(500).json({ error: "Polling failed" });
+            return res.status(500).json({ error: "Status check failed" });
         }
     }
 
-    // --- STEP 1: SUBMIT IMAGE ---
+    // IF SUBMITTING NEW
     try {
         const response = await fetch("https://api.siliconflow.cn", {
             method: "POST",
@@ -30,18 +25,17 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 model: "Wan-AI/Wan2.1-I2V-14B-720P-Turbo",
-                image_url: image // Send the compressed Base64
+                image_url: image
             })
         });
-
         const result = await response.json();
         
-        if (result.requestId || result.job_id) {
-            return res.status(200).json({ jobId: result.requestId || result.job_id });
-        } else {
-            return res.status(500).json({ error: result.message || "AI Rejected Request" });
-        }
+        // Return the Job ID so the website can check it later [3]
+        return res.status(200).json({ 
+            jobId: result.job_id || result.request_id, 
+            error: result.message 
+        });
     } catch (e) {
-        return res.status(500).json({ error: "Connection to AI failed" });
+        return res.status(500).json({ error: "Network Error" });
     }
 }
