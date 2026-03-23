@@ -1,81 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>MS-ADIC AI Studio</title>
+    <meta charset="UTF-8"><title>MS-ADIC AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; }
+        body { background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: #1e293b; padding: 30px; border-radius: 20px; text-align: center; width: 100%; max-width: 400px; }
     </style>
 </head>
 <body>
-    <div class="glass shadow-2xl">
-        <h1 class="text-3xl font-black mb-2 text-blue-500">MS-ADIC AI</h1>
-        <p class="text-slate-400 mb-8">Realistic Image to Video</p>
-        <input type="file" id="imgInput" accept="image/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white mb-6">
-        <button id="btn" onclick="run()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">GENERATE VIDEO ✨</button>
-        <p id="st" class="mt-4 text-blue-400 font-medium"></p>
-        <video id="vid" class="mt-6 hidden w-full rounded-xl shadow-lg border border-white/10" controls autoplay loop></video>
+    <div class="card shadow-2xl">
+        <h1 class="text-3xl font-bold text-blue-500 mb-6">MS-ADIC AI</h1>
+        <input type="file" id="img" accept="image/*" class="mb-6 block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white">
+        <button id="btn" onclick="start()" class="w-full bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 transition">GENERATE VIDEO</button>
+        <p id="msg" class="mt-4 text-blue-400"></p>
+        <video id="vid" class="mt-6 hidden w-full rounded-lg" controls autoplay loop></video>
     </div>
 
     <script>
-        async function run() {
-            const fileInput = document.getElementById('imgInput');
-            if (!fileInput.files[0]) return alert("Select a photo!");
+        async function start() {
+            const file = document.getElementById('img').files[0];
+            if (!file) return alert("Select photo!");
+            
             const btn = document.getElementById('btn');
-            const status = document.getElementById('st');
-            const video = document.getElementById('vid');
+            const msg = document.getElementById('msg');
+            const vid = document.getElementById('vid');
 
             btn.disabled = true;
-            status.innerText = "Step 1: Compressing...";
+            msg.innerText = "Step 1: Preparing AI...";
 
             const reader = new FileReader();
-            reader.readAsDataURL(fileInput.files[0]);
-            reader.onload = (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = async () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 512; canvas.height = 288;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, 512, 288);
-                    const smallBase64 = canvas.toDataURL('image/jpeg', 0.6);
+            reader.readAsDataURL(file);
+            reader.onload = async (e) => {
+                try {
+                    // Send to API
+                    const res = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: e.target.result })
+                    });
+                    const { jobId, error } = await res.json();
+                    if (error) throw new Error(error);
 
-                    status.innerText = "Step 2: Sending to AI...";
-                    try {
-                        const res = await fetch('/api/generate', {
+                    // Start checking every 10 seconds
+                    msg.innerText = "Step 2: AI Generating (Wait 60s)...";
+                    const timer = setInterval(async () => {
+                        const sRes = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image: smallBase64 })
+                            body: JSON.stringify({ jobId: jobId })
                         });
-                        const { jobId, error } = await res.json();
-                        if (error) throw new Error(error);
+                        const sData = await sRes.json();
 
-                        // --- POLLING LOGIC ---
-                        status.innerText = "Step 3: AI is working (60-90s)...";
-                        const checkStatus = setInterval(async () => {
-                            const sRes = await fetch('/api/generate', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ jobId: jobId })
-                            });
-                            const sData = await sRes.json();
-                            
-                            if (sData.status === 'SUCCEED') {
-                                clearInterval(checkStatus);
-                                video.src = sData.video_url;
-                                video.classList.remove('hidden');
-                                status.innerText = "Done! ✅";
-                                btn.disabled = false;
-                            } else if (sData.status === 'FAILED') {
-                                clearInterval(checkStatus);
-                                status.innerText = "AI Failed. Try again.";
-                                btn.disabled = false;
-                            }
-                        }, 10000); // Check every 10 seconds
+                        if (sData.status === 'SUCCEED') {
+                            clearInterval(timer);
+                            vid.src = sData.video_url;
+                            vid.classList.remove('hidden');
+                            msg.innerText = "Complete! ✅";
+                            btn.disabled = false;
+                        } else if (sData.status === 'FAILED') {
+                            clearInterval(timer);
+                            msg.innerText = "AI Failed. Check Credits.";
+                            btn.disabled = false;
+                        }
+                    }, 10000);
 
-                    } catch (err) { alert("Error: " + err.message); btn.disabled = false; }
-                };
+                } catch (err) {
+                    alert(err.message);
+                    btn.disabled = false;
+                    msg.innerText = "";
+                }
             };
         }
     </script>
