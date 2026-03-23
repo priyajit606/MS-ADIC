@@ -1,25 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MS-ADIC | AI Studio</title>
+    <meta charset="UTF-8"><title>MS-ADIC AI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; }
+        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
         .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="glass shadow-2xl">
         <h1 class="text-3xl font-black mb-2 text-blue-500">MS-ADIC AI</h1>
-        <p class="text-slate-400 mb-8 font-medium">Image to Realistic Video</p>
-        
+        <p class="text-slate-400 mb-8">Realistic Image to Video</p>
         <input type="file" id="imgInput" accept="image/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white mb-6">
-        
-        <button id="btn" onclick="run()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">
-            GENERATE VIDEO ✨
-        </button>
-        
+        <button id="btn" onclick="run()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">GENERATE VIDEO ✨</button>
         <p id="st" class="mt-4 text-blue-400 font-medium"></p>
         <video id="vid" class="mt-6 hidden w-full rounded-xl shadow-lg border border-white/10" controls autoplay loop></video>
     </div>
@@ -27,14 +21,13 @@
     <script>
         async function run() {
             const fileInput = document.getElementById('imgInput');
-            if (!fileInput.files[0]) return alert("Select a photo first!");
-            
+            if (!fileInput.files[0]) return alert("Select a photo!");
             const btn = document.getElementById('btn');
             const status = document.getElementById('st');
             const video = document.getElementById('vid');
 
             btn.disabled = true;
-            status.innerText = "Compressing Image...";
+            status.innerText = "Step 1: Compressing...";
 
             const reader = new FileReader();
             reader.readAsDataURL(fileInput.files[0]);
@@ -48,21 +41,40 @@
                     ctx.drawImage(img, 0, 0, 512, 288);
                     const smallBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-                    status.innerText = "AI Generating (approx 45s)...";
+                    status.innerText = "Step 2: Sending to AI...";
                     try {
                         const res = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ image: smallBase64 })
                         });
-                        const data = await res.json();
-                        if (data.url) {
-                            video.src = data.url;
-                            video.classList.remove('hidden');
-                            status.innerText = "Success! ✅";
-                        } else { status.innerText = "AI Error: " + (data.error || "Busy"); }
-                    } catch (err) { status.innerText = "Connection failed. Check Internet!"; }
-                    finally { btn.disabled = false; }
+                        const { jobId, error } = await res.json();
+                        if (error) throw new Error(error);
+
+                        // --- POLLING LOGIC ---
+                        status.innerText = "Step 3: AI is working (60-90s)...";
+                        const checkStatus = setInterval(async () => {
+                            const sRes = await fetch('/api/generate', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ jobId: jobId })
+                            });
+                            const sData = await sRes.json();
+                            
+                            if (sData.status === 'SUCCEED') {
+                                clearInterval(checkStatus);
+                                video.src = sData.video_url;
+                                video.classList.remove('hidden');
+                                status.innerText = "Done! ✅";
+                                btn.disabled = false;
+                            } else if (sData.status === 'FAILED') {
+                                clearInterval(checkStatus);
+                                status.innerText = "AI Failed. Try again.";
+                                btn.disabled = false;
+                            }
+                        }, 10000); // Check every 10 seconds
+
+                    } catch (err) { alert("Error: " + err.message); btn.disabled = false; }
                 };
             };
         }
