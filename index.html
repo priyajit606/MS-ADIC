@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MS-ADIC AI Studio</title>
+    <title>MS-ADIC | AI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; }
@@ -11,8 +11,8 @@
 </head>
 <body>
     <div class="glass shadow-2xl">
-        <h1 class="text-3xl font-black mb-2">MS-ADIC <span class="text-blue-500">AI</span></h1>
-        <p class="text-slate-400 mb-8">Image to Realistic Video</p>
+        <h1 class="text-3xl font-black mb-2 text-blue-500">MS-ADIC AI</h1>
+        <p class="text-slate-400 mb-8 font-medium">Image to Realistic Video</p>
         
         <input type="file" id="imgInput" accept="image/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white mb-6">
         
@@ -26,42 +26,44 @@
 
     <script>
         async function run() {
-            const file = document.getElementById('imgInput').files[0];
-            if (!file) return alert("Select a photo first!");
+            const fileInput = document.getElementById('imgInput');
+            if (!fileInput.files[0]) return alert("Select a photo first!");
             
             const btn = document.getElementById('btn');
             const status = document.getElementById('st');
             const video = document.getElementById('vid');
 
             btn.disabled = true;
-            status.innerText = "Step 1: Compressing Image...";
+            status.innerText = "Compressing Image...";
 
-            // --- AUTO COMPRESSOR TO FIX CONNECTION FAILED ---
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = async () => {
-                const canvas = document.createElement('canvas');
-                // Scale to 512x288 for fast AI processing
-                canvas.width = 512; canvas.height = 288;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, 512, 288);
-                const smallBase64 = canvas.toDataURL('image/jpeg', 0.8);
+            const reader = new FileReader();
+            reader.readAsDataURL(fileInput.files[0]);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 512; canvas.height = 288;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 512, 288);
+                    const smallBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-                status.innerText = "Step 2: AI Generating (45-60s)...";
-                try {
-                    const res = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: smallBase64 })
-                    });
-                    const data = await res.json();
-                    if (data.url) {
-                        video.src = data.url;
-                        video.classList.remove('hidden');
-                        status.innerText = "Done! ✅";
-                    } else { alert("AI Busy: " + data.error); }
-                } catch (e) { alert("Connection failed. Try a smaller photo!"); }
-                finally { btn.disabled = false; }
+                    status.innerText = "AI Generating (approx 45s)...";
+                    try {
+                        const res = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: smallBase64 })
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                            video.src = data.url;
+                            video.classList.remove('hidden');
+                            status.innerText = "Success! ✅";
+                        } else { status.innerText = "AI Error: " + (data.error || "Busy"); }
+                    } catch (err) { status.innerText = "Connection failed. Check Internet!"; }
+                    finally { btn.disabled = false; }
+                };
             };
         }
     </script>
