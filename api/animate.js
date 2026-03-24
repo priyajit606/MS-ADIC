@@ -1,37 +1,28 @@
 export default async function handler(req, res) {
-    const { prompt, jobId } = req.body;
+    // 1. Check if the key exists (Avoids crashing)
     const API_KEY = process.env.SF_KEY ? process.env.SF_KEY.trim() : null;
-
     if (!API_KEY) {
-        return res.status(500).json({ error: "SF_KEY missing in Vercel settings!" });
+        return res.status(500).json({ error: "Vercel Settings: SF_KEY is missing!" });
     }
 
-    // --- STEP 2: CHECK STATUS ---
-    if (jobId) {
-        try {
+    const { prompt, jobId } = req.body;
+
+    try {
+        // --- STEP 2: CHECK STATUS ---
+        if (jobId) {
             const sRes = await fetch(`https://api.siliconflow.cn{jobId}`, {
-                method: 'GET',
-                headers: { 
-                    "Authorization": `Bearer ${API_KEY}`,
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                }
+                headers: { "Authorization": `Bearer ${API_KEY}` }
             });
             const sData = await sRes.json();
             return res.status(200).json(sData);
-        } catch (e) {
-            return res.status(500).json({ error: "Status check failed" });
         }
-    }
 
-    // --- STEP 1: SUBMIT VIDEO ---
-    try {
+        // --- STEP 1: SUBMIT VIDEO ---
         const response = await fetch("https://api.siliconflow.cn", {
             method: "POST",
             headers: { 
                 "Authorization": `Bearer ${API_KEY}`, 
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                "Content-Type": "application/json" 
             },
             body: JSON.stringify({
                 model: "Wan-AI/Wan2.1-T2V-14B-720P-Turbo",
@@ -40,18 +31,13 @@ export default async function handler(req, res) {
         });
 
         const result = await response.json();
+        return res.status(200).json({ 
+            jobId: result.job_id || result.request_id, 
+            error: result.message 
+        });
 
-        if (response.status === 200 && (result.job_id || result.request_id)) {
-            return res.status(200).json({ 
-                jobId: result.job_id || result.request_id 
-            });
-        } else {
-            return res.status(response.status).json({ 
-                error: result.message || "AI Busy or Rejected" 
-            });
-        }
-
-    } catch (e) {
-        return res.status(500).json({ error: "Network Error: AI server unreachable" });
+    } catch (error) {
+        // This stops the Error 500 and tells you the real problem
+        return res.status(500).json({ error: "Server caught an error: " + error.message });
     }
 }
