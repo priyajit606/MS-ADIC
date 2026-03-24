@@ -1,76 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>MS-ADIC | AI Video Studio</title>
+    <meta charset="UTF-8"><title>MS-ADIC AI Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; }
-        textarea { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); width: 100%; padding: 15px; border-radius: 12px; color: white; outline: none; margin-bottom: 20px; resize: none; }
-        textarea:focus { border-color: #3b82f6; }
+        body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 40px; width: 100%; max-width: 420px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="glass shadow-2xl">
         <h1 class="text-3xl font-black mb-2 text-blue-500">MS-ADIC AI</h1>
-        <p class="text-slate-400 mb-8">Type your dream, we'll make the movie.</p>
-        <textarea id="promptInput" rows="4" placeholder="Describe your video (e.g. A neon tiger walking through a futuristic forest)"></textarea>
-        <button id="btn" onclick="run()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">GENERATE VIDEO ✨</button>
+        <p class="text-slate-400 mb-8">Cloud-Powered AI Video</p>
+        
+        <input type="file" id="fileInput" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white mb-6">
+        
+        <button id="btn" onclick="start()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all active:scale-95">
+            GENERATE VIDEO ✨
+        </button>
+        
         <p id="st" class="mt-4 text-blue-400 font-medium"></p>
         <video id="vid" class="mt-6 hidden w-full rounded-xl shadow-lg border border-white/10" controls autoplay loop></video>
     </div>
 
-    <script>
-        async function run() {
-            const prompt = document.getElementById('promptInput').value;
-            if (!prompt) return alert("Write something first!");
+    <script type="module">
+        import { upload } from 'https://esm.sh';
+
+        window.start = async () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return alert("Select a photo!");
+            
             const btn = document.getElementById('btn');
             const status = document.getElementById('st');
             const video = document.getElementById('vid');
 
             btn.disabled = true;
-            video.classList.add('hidden');
-            status.innerText = "Step 1: Submitting to AI...";
+            status.innerText = "Step 1: Uploading to Cloud...";
 
             try {
-                // SUBMIT REQUEST
+                // Upload to Vercel Blob (No 4.5MB limit)
+                const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload' });
+                
+                status.innerText = "Step 2: AI Generating (60s)...";
                 const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
+                    body: JSON.stringify({ imageUrl: blob.url })
                 });
-                const { jobId, error } = await res.json();
-                if (error) throw new Error(error);
-
-                // START POLLING
-                status.innerText = "Step 2: Generating (approx 60-90s)...";
-                const checkStatus = setInterval(async () => {
-                    const sRes = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ jobId: jobId })
-                    });
-                    const sData = await sRes.json();
-                    
-                    if (sData.status === 'SUCCEED') {
-                        clearInterval(checkStatus);
-                        video.src = sData.video_url;
-                        video.classList.remove('hidden');
-                        status.innerText = "Complete! ✅";
-                        btn.disabled = false;
-                    } else if (sData.status === 'FAILED') {
-                        clearInterval(checkStatus);
-                        status.innerText = "AI Failed. Try again.";
-                        btn.disabled = false;
-                    }
-                }, 10000); // Check every 10 seconds
-
-            } catch (err) { 
-                alert("Error: " + err.message); 
-                btn.disabled = false; 
-                status.innerText = "";
-            }
-        }
+                
+                const data = await res.json();
+                if (data.url) {
+                    video.src = data.url;
+                    video.classList.remove('hidden');
+                    status.innerText = "Done! ✅";
+                } else { alert("AI Error: " + data.error); }
+            } catch (e) { alert("Network Error: " + e.message); }
+            finally { btn.disabled = false; }
+        };
     </script>
 </body>
 </html>
