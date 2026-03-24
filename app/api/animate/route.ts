@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
+    
     const response = await fetch("https://api.siliconflow.cn", {
       method: "POST",
       headers: {
@@ -10,14 +11,14 @@ export async function POST(req: Request) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "Wan-AI/Wan2.1-T2V-14B",
+        model: "Wan-AI/Wan2.1-T2V-14B", // High-quality video model
         prompt: prompt
       })
     });
+
     const data = await response.json();
-    return NextResponse.json(data); 
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to submit" }, { status: 500 });
+    return NextResponse.json(data); // Sends the requestId to your website
+  } catch (error) {
+    return NextResponse.json({ error: "Check your Vercel API Key!" }, { status: 500 });
   }
 }
-
