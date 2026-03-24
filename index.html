@@ -1,57 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>MS-ADIC AI Studio</title>
+    <meta charset="UTF-8">
+    <title>MS-ADIC | Text-to-Video AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: radial-gradient(circle at top, #1e293b, #0f172a); min-height: 100vh; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; text-align: center; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 40px; width: 100%; max-width: 450px; text-align: center; }
+        textarea { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); width: 100%; padding: 15px; border-radius: 12px; color: white; outline: none; margin-bottom: 20px; }
+        textarea:focus { border-color: #3b82f6; }
     </style>
 </head>
 <body>
     <div class="glass shadow-2xl">
-        <h1 class="text-3xl font-black mb-2 text-blue-500">MS-ADIC AI</h1>
-        <p class="text-slate-400 mb-8">Cloud-Powered AI Video</p>
-        <input type="file" id="fileInput" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-600 file:text-white mb-6">
-        <button id="btn" onclick="start()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all active:scale-95">GENERATE VIDEO ✨</button>
+        <h1 class="text-3xl font-black mb-2 text-blue-500 text-center">MS-ADIC AI</h1>
+        <p class="text-slate-400 mb-8 text-center">Dream it. We'll make it a video.</p>
+        
+        <textarea id="promptInput" rows="4" placeholder="Describe your video (e.g. A futuristic city at night with neon lights)"></textarea>
+        
+        <button id="btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">
+            GENERATE VIDEO ✨
+        </button>
+        
         <p id="st" class="mt-4 text-blue-400 font-medium"></p>
-        <video id="vid" class="mt-6 hidden w-full rounded-xl shadow-lg" controls autoplay loop></video>
+        <video id="vid" class="mt-6 hidden w-full rounded-xl shadow-lg border border-white/10" controls autoplay loop></video>
     </div>
 
-    <script type="module">
-        import { upload } from 'https://esm.sh';
-
-        window.start = async () => {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Select a photo!");
+    <script>
+        async function generate() {
+            const prompt = document.getElementById('promptInput').value;
+            if (!prompt) return alert("Please type a description first!");
             
             const btn = document.getElementById('btn');
             const status = document.getElementById('st');
             const video = document.getElementById('vid');
 
             btn.disabled = true;
-            status.innerText = "Step 1: Uploading to Cloud...";
+            video.classList.add('hidden');
+            status.innerText = "AI is thinking (approx 45-60s)...";
 
             try {
-                // Upload to Vercel Blob (No 4.5MB limit)
-                const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload' });
-                
-                status.innerText = "Step 2: AI Generating (60s)...";
                 const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageUrl: blob.url })
+                    body: JSON.stringify({ prompt: prompt })
                 });
                 
                 const data = await res.json();
+                
                 if (data.url) {
                     video.src = data.url;
                     video.classList.remove('hidden');
                     status.innerText = "Done! ✅";
-                } else { alert("AI Error: " + data.error); }
-            } catch (e) { alert("Network Error: " + e.message); }
-            finally { btn.disabled = false; }
-        };
+                } else { 
+                    status.innerText = "Error: " + (data.error || "AI Busy"); 
+                }
+            } catch (e) { 
+                status.innerText = "Network Error. Please try again."; 
+            } finally { 
+                btn.disabled = false; 
+            }
+        }
     </script>
 </body>
 </html>
