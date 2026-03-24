@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/animate.js": {
-      "maxDuration": 60
-    }
-  }
-}
