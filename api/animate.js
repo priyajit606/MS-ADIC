@@ -1,19 +1,19 @@
 export default async function handler(req, res) {
     const { prompt, jobId } = req.body;
-    
-    // This pulls the key from your Vercel Environment Variables
-    // .trim() removes any accidental spaces at the start or end
     const API_KEY = process.env.SF_KEY ? process.env.SF_KEY.trim() : null;
 
     if (!API_KEY) {
-        return res.status(500).json({ error: "Vercel cannot find SF_KEY. Check Settings > Environment Variables!" });
+        return res.status(500).json({ error: "SF_KEY missing in Vercel!" });
     }
 
-    // --- STEP 2: CHECK STATUS (Polling) ---
+    // --- STEP 2: CHECK STATUS ---
     if (jobId) {
         try {
             const sRes = await fetch(`https://api.siliconflow.cn{jobId}`, {
-                headers: { "Authorization": `Bearer ${API_KEY}` }
+                headers: { 
+                    "Authorization": `Bearer ${API_KEY}`,
+                    "User-Agent": "Mozilla/5.0"
+                }
             });
             const sData = await sRes.json();
             return res.status(200).json(sData);
@@ -22,33 +22,35 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- STEP 1: SUBMIT NEW VIDEO ---
+    // --- STEP 1: SUBMIT VIDEO ---
     try {
         const response = await fetch("https://api.siliconflow.cn", {
             method: "POST",
             headers: { 
                 "Authorization": `Bearer ${API_KEY}`, 
-                "Content-Type": "application/json" 
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0"
             },
             body: JSON.stringify({
-                model: "Wan-AI/Wan2.1-T2V-14B-720P-Turbo", 
+                model: "Wan-AI/Wan2.1-T2V-14B-720P-Turbo",
                 prompt: prompt
             })
         });
 
-        const result = await response.json();
-        
-        // If the API returns a 401, the key is definitely wrong in Vercel
-        if (response.status === 401) {
-            return res.status(401).json({ error: "SiliconFlow says: Invalid API Key. Please re-copy it from their site!" });
+        // Check if the response is actually OK (200)
+        if (!response.ok) {
+            const errorData = await response.json();
+            return res.status(response.status).json({ error: errorData.message || "AI Busy" });
         }
 
-        if (result.job_id || result.request_id) {
-            return res.status(200).json({ jobId: result.job_id || result.request_id });
-        } else {
-            return res.status(500).json({ error: result.message || "AI Rejected the request" });
-        }
+        const result = await response.json();
+        return res.status(200).json({ 
+            jobId: result.job_id || result.request_id, 
+            error: result.message 
+        });
+
     } catch (e) {
-        return res.status(500).json({ error: "Network Error: Could not connect to AI" });
+        console.error("Fetch Error:", e);
+        return res.status(500).json({ error: "Network Error: AI server unreachable" });
     }
 }
